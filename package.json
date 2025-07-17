@@ -1,0 +1,16 @@
+{
+  "name": "internal_device_lab",
+  "version": "1.0.0",
+  "description": "Inernal Device Lab to start and collect the info of grid architecture",
+  "main": "server.js",
+  "scripts": {
+    "test": "node server.js",
+    "start": "node server.js"
+  },
+  "author": "Mohammed Mustafa",
+  "license": "ISC",
+  "devDependencies": {
+    "tree-kill": "^1.2.2",
+    "ws": "^8.18.3"
+  }
+}
