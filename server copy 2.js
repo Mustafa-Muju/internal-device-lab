@@ -2,10 +2,26 @@ const http = require('http');
 const WebSocket = require('ws');
 const { spawn, exec } = require('child_process');
 const path = require('path');
+const os = require('os');
 
 const PORT = 8080;
 const SELENIUM_GRID_PORT = 786;
 const APPIUM_PORT = 4725;
+
+// Get local IPv4 address (fallback to 127.0.0.1)
+function getLocalIP() {
+  const interfaces = os.networkInterfaces();
+  for (const iface of Object.values(interfaces)) {
+    for (const alias of iface) {
+      if (alias.family === 'IPv4' && !alias.internal) {
+        return alias.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
+
+const LOCAL_IP = getLocalIP();
 
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
@@ -18,6 +34,7 @@ const server = http.createServer((req, res) => {
         <title>Internal Device Lab</title>
         <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
         <style>
+          /* Your existing CSS here unchanged */
           * { box-sizing: border-box; margin: 0; padding: 0; }
           body {
             background-color: #0f0f0f;
@@ -67,7 +84,7 @@ const server = http.createServer((req, res) => {
             padding: 15px;
             border-radius: 6px;
             overflow-y: auto;
-            max-height: 300px;
+            max-height: 200px;
             font-size: 0.9em;
             color: #eaeaea;
             border: 1px solid #444;
@@ -110,6 +127,14 @@ const server = http.createServer((req, res) => {
             padding-left: 20px;
             margin-top: 6px;
           }
+          iframe#selenium-grid-frame {
+            width: 100%;
+            height: 600px;
+            border: none;
+            display: none;
+            margin-top: 10px;
+            border-radius: 8px;
+          }
         </style>
       </head>
       <body>
@@ -138,8 +163,8 @@ const server = http.createServer((req, res) => {
           <div class="card flex-col">
             <div class="card-header">🧭 <span>Architecture Links</span></div>
             <div>
-              <div>Selenium Grid: <a href="http://localhost:${SELENIUM_GRID_PORT}/ui/" target="_blank">http://localhost:${SELENIUM_GRID_PORT}/ui/</a></div>
-              <div>Appium Status: <a href="http://localhost:${APPIUM_PORT}/status" target="_blank">http://localhost:${APPIUM_PORT}/status</a></div>
+              <div>Selenium Grid: <a href="http://${LOCAL_IP}:${SELENIUM_GRID_PORT}/ui/" target="_blank">http://${LOCAL_IP}:${SELENIUM_GRID_PORT}/ui/</a></div>
+              <div>Appium Status: <a href="http://${LOCAL_IP}:${APPIUM_PORT}/status" target="_blank">http://${LOCAL_IP}:${APPIUM_PORT}/status</a></div>
             </div>
           </div>
         </div>
@@ -152,9 +177,15 @@ const server = http.createServer((req, res) => {
 
         <div id="tab-1" class="tab-content active"><pre id="output1">Loading Emulator Logs...</pre></div>
         <div id="tab-2" class="tab-content"><pre id="output2"></pre></div>
-        <div id="tab-3" class="tab-content"><pre id="output3"></pre></div>
+        <div id="tab-3" class="tab-content">
+          <pre id="output3">Loading Selenium Grid Logs...</pre>
+          <iframe id="selenium-grid-frame"></iframe>
+        </div>
 
         <script>
+          // Expose LOCAL_IP for iframe URL
+          const MACHINE_IP = '${LOCAL_IP}';
+
           document.querySelectorAll('[data-tab]').forEach(btn => {
             btn.onclick = () => {
               document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
@@ -164,7 +195,8 @@ const server = http.createServer((req, res) => {
             };
           });
 
-          ['script1','script2','script3'].forEach((s, i) => {
+          // Setup WebSocket for emulator and appium logs
+          ['script1','script2'].forEach((s, i) => {
             const ws = new WebSocket('ws://' + location.host + '/' + s);
             ws.onmessage = (e) => {
               const output = document.getElementById('output' + (i+1));
@@ -173,6 +205,24 @@ const server = http.createServer((req, res) => {
             };
           });
 
+          // Setup WebSocket for selenium grid logs with iframe display logic
+          const seleniumGridLogs = document.getElementById('output3');
+          const seleniumGridFrame = document.getElementById('selenium-grid-frame');
+          const wsScript3 = new WebSocket('ws://' + location.host + '/script3');
+
+          wsScript3.onmessage = (e) => {
+            const msg = e.data;
+            seleniumGridLogs.textContent += msg;
+            seleniumGridLogs.scrollTop = seleniumGridLogs.scrollHeight;
+
+            // Detect Selenium Grid ready, show iframe
+            if ((msg.toLowerCase().includes('server started') || msg.toLowerCase().includes('started')) && seleniumGridFrame.style.display === 'none') {
+              seleniumGridFrame.src = \`http://\${MACHINE_IP}:${SELENIUM_GRID_PORT}/ui/\`;
+              seleniumGridFrame.style.display = 'block';
+            }
+          };
+
+          // Cleanup WebSocket
           const cleanupWs = new WebSocket('ws://' + location.host + '/cleanup');
           const cleanupLog = document.getElementById('cleanup-log');
           const cleanupCard = document.getElementById('cleanup-card');
@@ -223,6 +273,7 @@ const server = http.createServer((req, res) => {
   }
 });
 
+// --- Your existing backend logic below remains unchanged ---
 const wss = new WebSocket.Server({ server });
 
 const scripts = {
@@ -386,7 +437,6 @@ async function startAppiumAndSeleniumGrid() {
       }
     });
 
-    // Wait for Appium to be ready before starting Selenium Grid
     if (!seleniumStarted && msg.toLowerCase().includes('listener started')) {
       seleniumStarted = true;
 
@@ -437,14 +487,14 @@ const killPort = (port) => {
     let cmd;
 
     if (process.platform === 'win32') {
-      // Windows: find processes on port and kill
+      // Use double quotes for the outer string and single quotes inside command
       cmd = `for /f "tokens=5" %a in ('netstat -ano ^| findstr :${port}') do taskkill /F /PID %a`;
     } else {
-      // macOS/Linux: use lsof to find and kill processes on port
+      // Use normal quotes as well
       cmd = `lsof -ti tcp:${port} | xargs -r kill -9 || true`;
     }
 
-    exec(cmd, (err, stdout, stderr) => {
+    exec(cmd, (err, stdout) => {
       if (err) {
         console.log(`No process on port ${port} or failed to kill.`);
       } else if (stdout.trim()) {
@@ -454,7 +504,6 @@ const killPort = (port) => {
     });
   });
 };
-
 
 wss.on('connection', (ws, req) => {
   ws.path = req.url;
@@ -486,7 +535,8 @@ function openBrowser(url) {
 }
 
 server.listen(PORT, () => {
-  const url = `http://localhost:${PORT}`;
+  const url = `http://${LOCAL_IP}:${PORT}`;
   openBrowser(url);
   console.log(`Server running at ${url}`);
 });
+
