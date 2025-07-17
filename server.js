@@ -6,8 +6,6 @@ const path = require('path');
 const PORT = 8080;
 const SELENIUM_GRID_PORT = 786;
 const APPIUM_PORT = 4725;
-const SELENIUM_GRID_URL = `http://localhost:${SELENIUM_GRID_PORT}`;
-const APPIUM_URL = `http://localhost:${APPIUM_PORT}`;
 
 const server = http.createServer((req, res) => {
   if (req.url === '/') {
@@ -18,66 +16,149 @@ const server = http.createServer((req, res) => {
       <head>
         <meta charset="UTF-8" />
         <title>Internal Device Lab</title>
+        <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap" rel="stylesheet">
         <style>
-          body { background: #121212; color: #ffffff; font-family: monospace; }
-          pre { height: 350px; overflow-y: scroll; background: #333; padding: 15px; }
-          button { padding: 10px; }
-          button.active { background: #0050ff; color: white; }
-          .tab-content { display: none; }
-          .tab-content.active { display: block; }
-          #cleanup-card {
-            background: #333;
-            color: #eee;
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 8px;
-            font-family: monospace;
-            height: 120px;
-            overflow-y: auto;
-            white-space: pre-wrap;
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body {
+            background-color: #0f0f0f;
+            color: #f0f0f0;
+            font-family: 'Roboto Mono', monospace;
+            padding: 20px;
           }
-          #status-card {
+          h1 {
+            color: #00bfff;
+            font-size: 2rem;
+            margin-bottom: 20px;
+          }
+          .card {
+            background: #1a1a1a;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+          }
+          .card-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #00bfff;
+          }
+          .status-block {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+          }
+          .btn {
             background: #222;
-            padding: 15px;
-            margin-bottom: 15px;
-            border-radius: 8px;
+            border: 1px solid #555;
+            padding: 6px 12px;
+            border-radius: 6px;
+            color: #fff;
+            cursor: pointer;
           }
-          #status-card a {
+          .btn:hover, .btn.active {
+            background-color: #007acc;
+          }
+          pre {
+            background: #121212;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-y: auto;
+            max-height: 300px;
+            font-size: 0.9em;
+            color: #eaeaea;
+            border: 1px solid #444;
+          }
+          .tab-bar {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+          }
+          .tab-content {
+            display: none;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 10px;
+            background-color: #1a1a1a;
+          }
+          .tab-content.active {
+            display: block;
+          }
+          .flex-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+          }
+          .flex-col {
+            flex: 1;
+          }
+          a {
             color: #00aaff;
             text-decoration: none;
+          }
+          details {
+            margin-top: 8px;
+          }
+          summary {
+            cursor: pointer;
+            padding: 4px 0;
+          }
+          ul {
+            padding-left: 20px;
+            margin-top: 6px;
           }
         </style>
       </head>
       <body>
-        <h1>Internal Device Lab</h1>
+        <h1>🧪 Internal Device Lab</h1>
 
-        <div id="cleanup-card">
-          <strong>Cleanup Status:</strong>
-          <pre id="cleanup-log" style="margin-top:8px;"></pre>
+        <div id="cleanup-card" class="card" style="margin-bottom: 20px;">
+          <div class="card-header">🧹 <span>Cleanup Status</span></div>
+          <pre id="cleanup-log">Waiting for cleanup to start...</pre>
         </div>
 
-        <div id="status-card">
-          <strong>Active Emulators:</strong> <span id="active-emulators">0</span><br />
-          <strong>Selenium Grid URL:</strong> <a href="${SELENIUM_GRID_URL}" target="_blank">${SELENIUM_GRID_URL}</a><br />
-          <strong>Appium Server URL:</strong> <a href="${APPIUM_URL}" target="_blank">${APPIUM_URL}</a>
+        <div class="flex-row">
+          <div class="card flex-col">
+            <div class="card-header">💻 <span>Device Status</span></div>
+            <div class="status-block">
+              <div>
+                <div>Active Devices: <span id="active-devices">0</span></div>
+                <details id="device-dropdown">
+                  <summary>Show Device List</summary>
+                  <ul id="device-list"></ul>
+                </details>
+              </div>
+              <button class="btn" onclick="fetchDevices()">🔄 Refresh</button>
+            </div>
+          </div>
+
+          <div class="card flex-col">
+            <div class="card-header">🧭 <span>Architecture Links</span></div>
+            <div>
+              <div>Selenium Grid: <a href="http://localhost:${SELENIUM_GRID_PORT}/ui/" target="_blank">http://localhost:${SELENIUM_GRID_PORT}/ui/</a></div>
+              <div>Appium Status: <a href="http://localhost:${APPIUM_PORT}/status" target="_blank">http://localhost:${APPIUM_PORT}/status</a></div>
+            </div>
+          </div>
         </div>
 
-        <button data-tab="1" class="active">Emulator</button>
-        <button data-tab="2">Appium</button>
-        <button data-tab="3">Selenium Grid</button>
-        <button onclick="fetchDevices()">🔄 Check Devices</button>
-        <div>
-          <strong>Connected Devices:</strong> <span id="device-count">0</span>
+        <div class="tab-bar">
+          <button class="btn active" data-tab="1">🖥 Emulator</button>
+          <button class="btn" data-tab="2">📱 Appium</button>
+          <button class="btn" data-tab="3">🌐 Selenium Grid</button>
         </div>
-        <div id="tab-1" class="tab-content active"><pre id="output1"></pre></div>
+
+        <div id="tab-1" class="tab-content active"><pre id="output1">Loading Emulator Logs...</pre></div>
         <div id="tab-2" class="tab-content"><pre id="output2"></pre></div>
         <div id="tab-3" class="tab-content"><pre id="output3"></pre></div>
 
         <script>
-          document.querySelectorAll('button[data-tab]').forEach(btn => {
+          document.querySelectorAll('[data-tab]').forEach(btn => {
             btn.onclick = () => {
-              document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-              document.querySelectorAll('button[data-tab]').forEach(b => b.classList.remove('active'));
+              document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active'));
+              document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
               btn.classList.add('active');
               document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
             };
@@ -94,29 +175,35 @@ const server = http.createServer((req, res) => {
 
           const cleanupWs = new WebSocket('ws://' + location.host + '/cleanup');
           const cleanupLog = document.getElementById('cleanup-log');
+          const cleanupCard = document.getElementById('cleanup-card');
 
           cleanupWs.onmessage = (e) => {
-            cleanupLog.textContent += e.data;
+            const msg = e.data;
+            cleanupLog.textContent += msg;
             cleanupLog.scrollTop = cleanupLog.scrollHeight;
+            if (msg.includes('Cleanup exited with code 0')) {
+              setTimeout(() => cleanupCard?.remove(), 1500);
+            }
           };
 
-          cleanupWs.onclose = () => {
-            const cleanupCard = document.getElementById('cleanup-card');
-            if (cleanupCard) cleanupCard.remove();
+          cleanupWs.onclose = cleanupWs.onerror = () => {
+            cleanupCard?.remove();
           };
 
-          cleanupWs.onerror = () => {
-            const cleanupCard = document.getElementById('cleanup-card');
-            if (cleanupCard) cleanupCard.remove();
-          };
-
-          function fetchDevices(){
-            fetch('/devices').then(res => res.json()).then(data => {
-              document.getElementById('device-count').textContent = data.count;
-              document.getElementById('active-emulators').textContent = data.emulatorCount || 0;
-            });
+          function fetchDevices() {
+            fetch('/devices')
+              .then(res => res.json())
+              .then(data => {
+                document.getElementById('active-devices').textContent = data.deviceCount;
+                const ul = document.getElementById('device-list');
+                ul.innerHTML = '';
+                data.devices.forEach(dev => {
+                  const li = document.createElement('li');
+                  li.textContent = dev;
+                  ul.appendChild(li);
+                });
+              });
           }
-
           fetchDevices();
           setInterval(fetchDevices, 10000);
         </script>
@@ -125,10 +212,10 @@ const server = http.createServer((req, res) => {
     `);
   } else if (req.url === '/devices') {
     exec('adb devices', (err, stdout) => {
-      if (err) return res.end(JSON.stringify({ count: 0, emulatorCount: 0 }));
-      const deviceCount = (stdout.match(/\tdevice/g) || []).length;
-      const emulatorCount = (stdout.match(/emulator-/g) || []).length;
-      res.end(JSON.stringify({ count: deviceCount, emulatorCount }));
+      if (err) return res.end(JSON.stringify({ deviceCount: 0, devices: [] }));
+      const lines = stdout.split('\n').slice(1).map(l => l.trim()).filter(l => l.endsWith('\tdevice'));
+      const devices = lines.map(l => l.split('\t')[0]);
+      res.end(JSON.stringify({ deviceCount: devices.length, devices }));
     });
   } else {
     res.writeHead(404);
@@ -162,8 +249,8 @@ function broadcastCleanup(message) {
 async function runCleanupWithBroadcast() {
   cleanupRunning = true;
 
-  const cleanupScript = process.platform === 'win32' 
-    ? path.join(__dirname, 'windows', 'cleanup.bat') 
+  const cleanupScript = process.platform === 'win32'
+    ? path.join(__dirname, 'windows', 'cleanup.bat')
     : './cleanup.sh';
 
   const proc = spawn(cleanupScript, [], { shell: true });
