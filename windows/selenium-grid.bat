@@ -24,6 +24,6 @@ if not exist "%SELENIUM_JAR%" (
 echo [GRID] Starting Selenium Grid on ports 786...
 
 REM Start Selenium Grid (both UI and event bus)
-java -jar "%SELENIUM_JAR%" standalone --host localhost --port 786
+java -jar "%SELENIUM_JAR%" standalone --port 786 --config node-grid-config.toml
 
 endlocal

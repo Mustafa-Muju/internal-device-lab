@@ -1,0 +1,12 @@
+[server]
+port = 786
+ 
+[node]
+detect-drivers = false
+ 
+[relay]
+url = "http://localhost:4725"
+status-endpoint = "/status"
+configs = [
+"1", "{ \"platformName\":\"Android\",\"appium:udid\":\"emulator-5554\",\"appium:automationName\":\"UiAutomator2\",\"appium:fullReset\":true,\"appium:noReset\":false,\"appium:unicodeKeyboard\":true,\"appium:autoGrantPermissions\":true,\"appium:uiautomator2ServerInstallTimeout\":30000,\"appium:adbExecTimeout\":30000,\"appium:waitForIdleTimeout\":500 }"
+]
